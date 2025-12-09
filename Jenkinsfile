@@ -3,7 +3,7 @@ pipeline {
     
     environment {
         DOCKER_IMAGE = 'markhobson/maven-chrome:latest'
-        GIT_REPO = 'https://github.com/saffanoor001/todo-selenium-tests.git'
+        GIT_REPO = 'https://github.com/saffanoor001/TestingToDoApp_tests.git'
     }
     
     stages {
