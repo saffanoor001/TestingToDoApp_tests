@@ -73,3 +73,8 @@ Status: ${currentBuild.result}
 Check console: ${env.BUILD_URL}console
                 """,
                 to: '${GIT_COMMITTER_EMAIL}',
+                attachLog: true
+            )
+        }
+    }
+}
