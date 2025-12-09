@@ -6,6 +6,7 @@ pipeline {
     }
     
     stages {
+        
         stage('Checkout') {
             steps {
                 git branch: 'main', 
@@ -15,28 +16,21 @@ pipeline {
         
         stage('Build') {
             steps {
-                script {
-                    echo 'Building the project with Maven...'
-                    sh 'mvn clean compile'
-                }
+                echo 'Building the project with Maven...'
+                sh 'mvn clean compile'
             }
         }
-        
+
         stage('Test') {
             agent {
                 docker {
                     image 'markhobson/maven-chrome:latest'
-                    args '--shm-size=2g -v $HOME/.m2:/root/.m2:rw'
-                    reuseNode true
+                    args '-v $HOME/.m2:/root/.m2 --shm-size=2g'
                 }
             }
             steps {
-                script {
-                    echo 'Running Selenium tests in Docker container...'
-                    sh '''
-                        mvn clean test -Dtest=SeleniumIntegrationTest
-                    '''
-                }
+                echo 'Running Selenium tests in Docker container...'
+                sh 'mvn clean test -Dtest=SeleniumIntegrationTest'
             }
             post {
                 always {
@@ -79,8 +73,3 @@ Status: ${currentBuild.result}
 Check console: ${env.BUILD_URL}console
                 """,
                 to: '${GIT_COMMITTER_EMAIL}',
-                attachLog: true
-            )
-        }
-    }
-}
