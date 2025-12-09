@@ -25,7 +25,7 @@ pipeline {
             agent {
                 docker {
                     image 'markhobson/maven-chrome:latest'
-                    args '-v $HOME/.m2:/root/.m2 --shm-size=2g'
+                    args '-v $HOME/.m2:/root/.m2 --shm-size=2g --entrypoint=""'
                 }
             }
             steps {
@@ -34,7 +34,7 @@ pipeline {
             }
             post {
                 always {
-                    junit '**/target/surefire-reports/*.xml'
+                    junit 'target/surefire-reports/*.xml'
                 }
             }
         }
@@ -46,32 +46,16 @@ pipeline {
         }
         success {
             emailext (
-                subject: "✅ Build Success: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: """
-Build successful!
-
-Job: ${env.JOB_NAME}
-Build Number: ${env.BUILD_NUMBER}
-Status: ${currentBuild.result}
-
-Check details: ${env.BUILD_URL}
-                """,
+                subject: "Build SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: "Build succeeded.\n\nURL: ${env.BUILD_URL}",
                 to: '${GIT_COMMITTER_EMAIL}',
                 attachLog: true
             )
         }
         failure {
             emailext (
-                subject: "❌ Build Failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: """
-Build failed!
-
-Job: ${env.JOB_NAME}
-Build Number: ${env.BUILD_NUMBER}
-Status: ${currentBuild.result}
-
-Check console: ${env.BUILD_URL}console
-                """,
+                subject: "Build FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: "Build failed.\n\nURL: ${env.BUILD_URL}console",
                 to: '${GIT_COMMITTER_EMAIL}',
                 attachLog: true
             )
