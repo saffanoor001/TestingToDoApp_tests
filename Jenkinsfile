@@ -11,7 +11,7 @@ pipeline {
             steps {
                 script {
                     echo 'Checking out test code from GitHub...'
-                    git branch: 'main', url: "${GIT_REPO}"
+                    git branch: 'main', credentialsId: 'github-credentials', url: "${GIT_REPO}"
                 }
             }
         }
