@@ -1,12 +1,11 @@
 pipeline {
     agent any
-    
+
     environment {
         DOCKER_IMAGE = 'markhobson/maven-chrome:latest'
         GIT_REPO = 'https://github.com/saffanoor001/TestingToDoApp_tests.git'
-        MAVEN_REPO = "${env.WORKSPACE}/.m2" // Workspace-local Maven repo
     }
-    
+
     stages {
         stage('Checkout') {
             steps {
@@ -14,44 +13,63 @@ pipeline {
                 git branch: 'main', url: "${GIT_REPO}"
             }
         }
-        
-        stage('Build') {
+
+        stage('Build & Test in Docker') {
             steps {
-                echo 'Building the test project inside Docker...'
                 script {
-                    docker.image(DOCKER_IMAGE).inside("-v ${MAVEN_REPO}:/root/.m2 --shm-size=2g") {
-                        sh 'mvn clean compile -Dmaven.repo.local=/root/.m2'
-                    }
-                }
-            }
-        }
-        
-        stage('Test') {
-            steps {
-                echo 'Running Selenium tests in headless Chrome inside Docker...'
-                script {
-                    docker.image(DOCKER_IMAGE).inside("-v ${MAVEN_REPO}:/root/.m2 --shm-size=2g") {
-                        sh 'mvn clean test -Dmaven.repo.local=/root/.m2 -Dtest=SeleniumIntegrationTest'
+                    docker.image("${DOCKER_IMAGE}").inside("--shm-size=2g -u 111:113") {
+                        // Use workspace-local Maven repo to avoid permission issues
+                        sh 'mkdir -p ${WORKSPACE}/.m2'
+                        sh 'mvn clean compile -Dmaven.repo.local=${WORKSPACE}/.m2'
+                        sh 'mvn test -Dmaven.repo.local=${WORKSPACE}/.m2 -Dtest=SeleniumIntegrationTest'
                     }
                 }
             }
             post {
                 always {
+                    // Archive test results
                     junit '**/target/surefire-reports/*.xml'
                 }
             }
         }
     }
-    
+
     post {
         always {
             echo 'Pipeline execution completed'
         }
         success {
-            echo "Build succeeded! You can add emailext here."
+            emailext (
+                to: '${GIT_COMMITTER_EMAIL}',
+                subject: "✅ SUCCESS : Todo App Tests - Build #${env.BUILD_NUMBER}",
+                body: """
+                <html><body>
+                <h2>✅ Pipeline Execution Successful</h2>
+                <p>Build Number: ${env.BUILD_NUMBER}</p>
+                <p>Job: ${env.JOB_NAME}</p>
+                <p><a href="${env.BUILD_URL}">View Build Details</a></p>
+                <p><a href="${env.BUILD_URL}testReport/">View Test Report</a></p>
+                </body></html>
+                """,
+                mimeType: 'text/html',
+                attachLog: true
+            )
         }
         failure {
-            echo "Build failed! You can add emailext here."
+            emailext (
+                to: '${GIT_COMMITTER_EMAIL}',
+                subject: "❌ FAILURE: Todo App Tests - Build #${env.BUILD_NUMBER}",
+                body: """
+                <html><body>
+                <h2>❌ Pipeline Execution Failed</h2>
+                <p>Build Number: ${env.BUILD_NUMBER}</p>
+                <p>Job: ${env.JOB_NAME}</p>
+                <p><a href="${env.BUILD_URL}console">View Console Output</a></p>
+                </body></html>
+                """,
+                mimeType: 'text/html',
+                attachLog: true
+            )
         }
     }
 }
