@@ -62,7 +62,7 @@ pipeline {
         success {
             emailext (
                 to: '${GIT_COMMITTER_EMAIL}',
-                subject: "✅ SUCCESS : Todo App Tests - Build #${env.BUILD_NUMBER}",
+                subject: "✅   SUCCESS : Todo App Tests - Build #${env.BUILD_NUMBER}",
                 body: "Pipeline succeeded. Check build: ${env.BUILD_URL}",
                 attachLog: true
             )
