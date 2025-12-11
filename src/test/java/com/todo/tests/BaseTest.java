@@ -14,7 +14,7 @@ import java.time.Duration;
 public class BaseTest {
     protected WebDriver driver;
     protected WebDriverWait wait;
-    protected String baseUrl = "http://13.51.205.213";
+    protected String baseUrl = "http://13.51.205.213:8000";
 
     @BeforeAll
     public static void setupClass() {
