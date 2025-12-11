@@ -60,7 +60,7 @@ pipeline {
         success {
             emailext (
                 to: '${GIT_COMMITTER_EMAIL}',
-                subject: "✅ SUCCESS : Todo App Tests - Build #${env.BUILD_NUMBER}",
+                subject: "✅ SUCCES: Todo App Tests - Build #${env.BUILD_NUMBER}",
                 body: """<html>
                     <body style="font-family: Arial, sans-serif;">
                         <div style="background: #d4edda; padding: 20px; border-radius: 5px; border-left: 4px solid #28a745;">
