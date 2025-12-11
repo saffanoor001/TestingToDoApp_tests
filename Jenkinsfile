@@ -26,30 +26,22 @@ pipeline {
         }
         
         stage('Test') {
-            agent {
-                docker {
-                    image "${DOCKER_IMAGE}"
-                    args '-v /var/run/docker.sock:/var/run/docker.sock --shm-size=2g'
-                }
-            }
-            steps {
-                script {
-                    echo 'Running Selenium tests in Docker container...'
-                    try {
-                        sh 'mvn clean test'
-                        currentBuild.result = 'SUCCESS'
-                    } catch (Exception e) {
-                        currentBuild.result = 'FAILURE'
-                        throw e
-                    }
-                }
-            }
-            post {
-                always {
-                    junit '**/target/surefire-reports/*.xml'
-                }
-            }
+    agent {
+        docker {
+            image 'markhobson/maven-chrome:latest'
+            args '-v $HOME/.m2:/root/.m2'
         }
+    }
+    steps {
+        sh 'mvn clean test -Dtest=SeleniumIntegrationTest'
+    }
+    post {
+        always {
+            junit '**/target/surefire-reports/*.xml'
+        }
+    }
+}
+
     }
     
     post {
