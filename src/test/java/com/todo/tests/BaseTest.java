@@ -43,7 +43,7 @@ public class BaseTest {
     }
 
     protected void registerUser(String username, String email, String password) {
-        driver.get(baseUrl + "/register");
+        driver.get(baseUrl + "/register ");
         driver.findElement(org.openqa.selenium.By.id("username")).sendKeys(username);
         driver.findElement(org.openqa.selenium.By.id("email")).sendKeys(email);
         driver.findElement(org.openqa.selenium.By.id("password")).sendKeys(password);
