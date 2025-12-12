@@ -4,30 +4,28 @@ pipeline {
     environment {
         DOCKER_IMAGE = 'markhobson/maven-chrome:latest'
         GIT_REPO = 'https://github.com/saffanoor001/TestingToDoApp_tests.git'
+        NOTIFY_EMAIL = 'your_email@example.com'  // <-- Replace with your real email
+        MAVEN_REPO_VOLUME = "${HOME}/.m2:/root/.m2" // mount local Maven repo
     }
     
     stages {
         stage('Checkout') {
             steps {
-                script {
-                    echo 'Checking out test code from GitHub...'
-                    git branch: 'main', url: "${GIT_REPO}"
-                    
-                    // Capture committer email for notifications
-                    env.COMMIT_EMAIL = sh(
-                        script: "git --no-pager log -1 --pretty=format:'%ae'",
-                        returnStdout: true
-                    ).trim()
-                }
+                echo 'Checking out test code from GitHub...'
+                git branch: 'main', url: "${GIT_REPO}"
             }
         }
         
         stage('Build') {
-            steps {
-                script {
-                    echo 'Building the test project...'
-                    sh 'mvn clean compile'
+            agent {
+                docker {
+                    image "${DOCKER_IMAGE}"
+                    args "--shm-size=2g -v ${MAVEN_REPO_VOLUME}"
                 }
+            }
+            steps {
+                echo 'Building the test project...'
+                sh 'mvn clean compile'
             }
         }
         
@@ -35,24 +33,16 @@ pipeline {
             agent {
                 docker {
                     image "${DOCKER_IMAGE}"
-                    args '--shm-size=2g -v /var/lib/jenkins/.m2:/root/.m2'
+                    args "--shm-size=2g -v ${MAVEN_REPO_VOLUME}"
                 }
             }
             steps {
-                script {
-                    echo 'Running Selenium tests in Docker container...'
-                    try {
-                        sh 'mvn -Dmaven.repo.local=/root/.m2/repository clean test'
-                        currentBuild.result = 'SUCCESS'
-                    } catch (Exception e) {
-                        currentBuild.result = 'FAILURE'
-                        throw e
-                    }
-                }
+                echo 'Running Selenium tests in Docker container...'
+                sh 'mvn test'
             }
             post {
                 always {
-                    junit 'target/surefire-reports/*.xml'
+                    junit '**/target/surefire-reports/*.xml'
                 }
             }
         }
@@ -62,41 +52,43 @@ pipeline {
         always {
             echo 'Pipeline execution completed'
         }
-        
         success {
             emailext (
-                to: "${env.COMMIT_EMAIL}",
+                to: "${NOTIFY_EMAIL}",
                 subject: "✅ SUCCESS : Todo App Tests - Build #${env.BUILD_NUMBER}",
-                mimeType: 'text/html',
-                attachLog: true,
                 body: """
                     <html>
                     <body style="font-family: Arial, sans-serif;">
-                        <h2 style="color: #155724;">✅ Pipeline Execution Successful</h2>
-                        <p><strong>Committer:</strong> ${env.COMMIT_EMAIL}</p>
-                        <p><a href="${env.BUILD_URL}">View Build</a></p>
-                        <p><a href="${env.BUILD_URL}testReport/">View Test Report</a></p>
+                        <h2 style="color: green;">✅ Pipeline Execution Successful</h2>
+                        <p><strong>Job:</strong> ${env.JOB_NAME}</p>
+                        <p><strong>Build Number:</strong> ${env.BUILD_NUMBER}</p>
+                        <p><strong>Committer:</strong> ${env.GIT_COMMITTER_NAME} (${env.GIT_COMMITTER_EMAIL})</p>
+                        <p><a href="${env.BUILD_URL}" style="font-weight:bold;">📋 View Full Build Log</a></p>
+                        <p><a href="${env.BUILD_URL}testReport/" style="font-weight:bold;">📊 View Detailed Test Report</a></p>
                     </body>
                     </html>
-                """
+                """,
+                mimeType: 'text/html',
+                attachLog: true
             )
         }
-        
         failure {
             emailext (
-                to: "${env.COMMIT_EMAIL}",
+                to: "${NOTIFY_EMAIL}",
                 subject: "❌ FAILURE: Todo App Tests - Build #${env.BUILD_NUMBER}",
-                mimeType: 'text/html',
-                attachLog: true,
                 body: """
                     <html>
                     <body style="font-family: Arial, sans-serif;">
-                        <h2 style="color: #721c24;">❌ Pipeline Failed</h2>
-                        <p><strong>Committer:</strong> ${env.COMMIT_EMAIL}</p>
-                        <p><a href="${env.BUILD_URL}console">View Console Output</a></p>
+                        <h2 style="color: red;">❌ Pipeline Execution Failed</h2>
+                        <p><strong>Job:</strong> ${env.JOB_NAME}</p>
+                        <p><strong>Build Number:</strong> ${env.BUILD_NUMBER}</p>
+                        <p><strong>Committer:</strong> ${env.GIT_COMMITTER_NAME}</p>
+                        <p><a href="${env.BUILD_URL}console" style="font-weight:bold;">🖥️ View Console Output</a></p>
                     </body>
                     </html>
-                """
+                """,
+                mimeType: 'text/html',
+                attachLog: true
             )
         }
     }
