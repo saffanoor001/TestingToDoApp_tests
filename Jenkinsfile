@@ -5,7 +5,6 @@ pipeline {
         DOCKER_IMAGE = 'markhobson/maven-chrome:latest'
         GIT_REPO = 'https://github.com/saffanoor001/TestingToDoApp_tests.git'
         NOTIFY_EMAIL = 'your_email@example.com'
-        MAVEN_REPO_VOLUME = "/var/lib/jenkins/.m2:/root/.m2" // Host Maven repo mounted into container
     }
 
     stages {
@@ -17,29 +16,28 @@ pipeline {
         }
 
         stage('Build') {
+            agent {
+                docker {
+                    image "${DOCKER_IMAGE}"
+                    args '--shm-size=2g -v /var/lib/jenkins/.m2:/root/.m2'
+                }
+            }
             steps {
                 echo 'Building the test project...'
-                // Use Docker for build to ensure Maven is available
-                docker.image("${DOCKER_IMAGE}").inside("--shm-size=2g -v ${MAVEN_REPO_VOLUME}") {
-                    sh 'mvn clean compile'
-                }
+                sh 'mvn clean compile'
             }
         }
 
         stage('Test') {
+            agent {
+                docker {
+                    image "${DOCKER_IMAGE}"
+                    args '--shm-size=2g -v /var/lib/jenkins/.m2:/root/.m2'
+                }
+            }
             steps {
                 echo 'Running Selenium tests in Docker container...'
-                docker.image("${DOCKER_IMAGE}").inside("--shm-size=2g -v ${MAVEN_REPO_VOLUME}") {
-                    script {
-                        try {
-                            sh 'mvn test'
-                            currentBuild.result = 'SUCCESS'
-                        } catch (Exception e) {
-                            currentBuild.result = 'FAILURE'
-                            throw e
-                        }
-                    }
-                }
+                sh 'mvn test'
             }
             post {
                 always {
