@@ -1,46 +1,84 @@
 pipeline {
     agent any
     
+    environment {
+        DOCKER_IMAGE = 'todo-app-tests'
+        APP_CONTAINER = 'todo-app'
+    }
+    
     stages {
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
-                echo 'Checking out test code from GitHub...'
-                git branch: 'main', 
-                    url: 'https://github.com/saffanoor001/TestingToDoApp_tests.git'
+                echo '========================================='
+                echo 'STAGE 1: Checking out code from GitHub'
+                echo '========================================='
+                checkout scm
             }
         }
         
-        stage('Build') {
-            agent {
-                docker {
-                    image 'markhobson/maven-chrome:latest'
-                    args '--shm-size=2g -u root -v $HOME/.m2:/root/.m2:rw'
-                    reuseNode true
-                }
-            }
+        stage('Setup Application') {
             steps {
-                echo 'Building the test project...'
-                sh 'mvn clean compile'
+                echo '========================================='
+                echo 'STAGE 2: Starting Todo Application'
+                echo '========================================='
+                script {
+                    sh '''
+                        # Stop and remove existing containers
+                        docker stop ${APP_CONTAINER} || true
+                        docker rm ${APP_CONTAINER} || true
+                        
+                        # Remove old database to ensure fresh state
+                        rm -f instance/todo.db || true
+                        
+                        # Start Flask application in background
+                        docker run -d \
+                            --name ${APP_CONTAINER} \
+                            -p 80:80 \
+                            --network host \
+                            -v $(pwd):/app \
+                            -w /app \
+                            python:3.9-slim \
+                            bash -c "pip install -r requirements.txt && python app.py"
+                        
+                        # Wait for application to be ready
+                        echo "Waiting for application to start..."
+                        sleep 15
+                        
+                        # Test if app is responding
+                        curl -f http://localhost:80 || (echo "App failed to start" && exit 1)
+                        echo "Application is running successfully!"
+                    '''
+                }
             }
         }
         
-        stage('Test') {
-            agent {
-                docker {
-                    image 'markhobson/maven-chrome:latest'
-                    args '--shm-size=2g -u root -v $HOME/.m2:/root/.m2:rw'
-                    reuseNode true
+        stage('Build Test Environment') {
+            steps {
+                echo '========================================='
+                echo 'STAGE 3: Building Docker image for tests'
+                echo '========================================='
+                script {
+                    sh '''
+                        docker build -t ${DOCKER_IMAGE} -f Dockerfile .
+                        echo "Test environment built successfully!"
+                    '''
                 }
             }
+        }
+        
+        stage('Run Selenium Tests') {
             steps {
-                echo 'Running Selenium tests...'
-                sh '''
-                    mvn test -Dtest=SeleniumIntegrationTest || true
-                '''
-            }
-            post {
-                always {
-                    junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
+                echo '========================================='
+                echo 'STAGE 4: Running Selenium Tests'
+                echo '========================================='
+                script {
+                    sh '''
+                        docker run --rm \
+                            --network host \
+                            -v $(pwd)/tests:/tests \
+                            ${DOCKER_IMAGE} \
+                            python -m unittest test_todo_app.TodoAppTests -v
+                    '''
                 }
             }
         }
@@ -48,37 +86,28 @@ pipeline {
     
     post {
         always {
-            echo 'Pipeline execution completed'
+            echo '========================================='
+            echo 'CLEANUP: Stopping application'
+            echo '========================================='
+            script {
+                sh '''
+                    docker stop ${APP_CONTAINER} || true
+                    docker rm ${APP_CONTAINER} || true
+                    docker rmi ${DOCKER_IMAGE} || true
+                '''
+            }
         }
         success {
-            emailext (
-                subject: "✅ Build Success: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: """
-Build successful!
-
-Job: ${env.JOB_NAME}
-Build Number: ${env.BUILD_NUMBER}
-
-Check details: ${env.BUILD_URL}
-                """,
-                to: 'your_email@example.com',
-                attachLog: true
-            )
+            echo '========================================='
+            echo '✅ PIPELINE COMPLETED SUCCESSFULLY!'
+            echo 'All tests passed.'
+            echo '========================================='
         }
         failure {
-            emailext (
-                subject: "❌ Build Failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: """
-Build failed!
-
-Job: ${env.JOB_NAME}
-Build Number: ${env.BUILD_NUMBER}
-
-Check console: ${env.BUILD_URL}console
-                """,
-                to: 'your_email@example.com',
-                attachLog: true
-            )
+            echo '========================================='
+            echo '❌ PIPELINE FAILED!'
+            echo 'Check test results above.'
+            echo '========================================='
         }
     }
 }
